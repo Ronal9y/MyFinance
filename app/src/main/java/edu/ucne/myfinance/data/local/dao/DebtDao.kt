@@ -4,7 +4,7 @@ import androidx.room.*
 import edu.ucne.myfinance.data.local.entity.DebtEntity
 import kotlinx.coroutines.flow.Flow
 
-// data/local/dao/DebtDao.kt
+
 @Dao
 interface DebtDao {
     @Query("SELECT * FROM debts")

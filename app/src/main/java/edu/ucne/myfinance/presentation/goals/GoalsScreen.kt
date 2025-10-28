@@ -12,6 +12,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import edu.ucne.myfinance.R
+import edu.ucne.myfinance.common.components.LottieAnimationView
 import edu.ucne.myfinance.ui.theme.MyFinanceTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -22,6 +24,15 @@ fun GoalsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+
+    val justCompletedGoal = state.goals.find { it.currentAmount >= it.targetAmount }
+    var showCelebration by remember { mutableStateOf(false) }
+
+    LaunchedEffect(justCompletedGoal?.id) {
+        justCompletedGoal?.let {
+            showCelebration = true
+        }
+    }
 
     if (showAddDialog) {
         AddGoalDialog(
@@ -40,61 +51,79 @@ fun GoalsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(
-                        "Metas de Ahorro",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar Meta")
-            }
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .padding(innerPadding)
-                .fillMaxSize()
-        ) {
-            if (state.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator()
-                }
-            } else if (state.goals.isEmpty()) {
-                EmptyGoalsSection { showAddDialog = true }
-            } else {
-                GoalListScreen(
-                    goals = state.goals,
-                    onDeleteGoal = { id ->
-                        viewModel.onEvent(GoalsEvent.DeleteGoal(id))
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            "Metas de Ahorro",
+                            fontWeight = FontWeight.Bold
+                        )
                     },
-                    onAddToGoal = { id, amount ->
-                        viewModel.onEvent(GoalsEvent.AddToGoal(id, amount))
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        }
                     }
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar Meta")
+                }
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize()
+            ) {
+                if (state.isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else if (state.goals.isEmpty()) {
+                    EmptyGoalsSection { showAddDialog = true }
+                } else {
+                    GoalListScreen(
+                        goals = state.goals,
+                        onDeleteGoal = { viewModel.onEvent(GoalsEvent.DeleteGoal(it)) },
+                        onAddToGoal = { id, amount -> viewModel.onEvent(GoalsEvent.AddToGoal(id, amount)) }
+                    )
+                }
+            }
+        }
+
+        // ✅ Animación SUPER-PUESTA, fuera del Scaffold
+        if (showCelebration) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 100.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                LottieAnimationView(
+                    resId = R.raw.celebration,
+                    modifier = Modifier.size(300.dp),
+                    iterations = 1
+                )
+            }
+
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(5000)
+                showCelebration = false
             }
         }
     }
 }
+
 
 @Composable
 fun EmptyGoalsSection(onAddGoal: () -> Unit) {
@@ -106,6 +135,12 @@ fun EmptyGoalsSection(onAddGoal: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            LottieAnimationView(
+                resId = R.raw.saving_money,
+                modifier = Modifier.size(250.dp),
+                iterations = Int.MAX_VALUE // Bucle infinito
+            )
+
             Text(
                 "No hay metas",
                 style = MaterialTheme.typography.bodyLarge

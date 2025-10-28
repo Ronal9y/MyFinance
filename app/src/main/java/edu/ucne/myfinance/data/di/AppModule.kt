@@ -25,7 +25,8 @@ object AppModule {
             FinanceDatabase::class.java,
             "finance_db"
         )
-            .fallbackToDestructiveMigration()
+           .fallbackToDestructiveMigration()
+            //.addMigrations()
             .build()
     }
 

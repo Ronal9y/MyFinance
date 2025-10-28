@@ -1,8 +1,14 @@
 package edu.ucne.myfinance.presentation.budgets
 
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.internal.Contexts.getApplication
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import edu.ucne.myfinance.common.NotificationHelper
 import edu.ucne.myfinance.domain.model.Budget
 import edu.ucne.myfinance.domain.usecases.Budgets.*
 import kotlinx.coroutines.flow.*
@@ -14,8 +20,9 @@ class BudgetsViewModel @Inject constructor(
     private val getBudgets: GetBudgetsUseCase,
     private val deleteBudgetById: DeleteBudgetByIdUseCase,
     private val insertBudget: InsertBudgetUseCase,
-    private val updateBudgetSpent: UpdateBudgetSpentUseCase
-) : ViewModel() {
+    private val updateBudgetSpent: UpdateBudgetSpentUseCase,
+    @ApplicationContext private val context: Context
+) : AndroidViewModel(context as Application) {
 
     private val _state = MutableStateFlow(BudgetsState())
     val state: StateFlow<BudgetsState> = _state.asStateFlow()
@@ -44,9 +51,16 @@ class BudgetsViewModel @Inject constructor(
 
     private fun syncSpent() = viewModelScope.launch {
         runCatching {
-            updateBudgetSpent() // ← Esto actualiza los spent en la base de datos
+            updateBudgetSpent()
+        }.onSuccess {
+            loadBudgets()
+            // Verificar cada presupuesto
+            state.value.budgets.forEach { budget ->
+                checkAndNotifyThreshold(budget)
+            }
+        }.onFailure {
+            _state.update { s -> s.copy(error = it.message) }
         }
-            .onFailure { _state.update { s -> s.copy(error = it.message) } }
     }
 
     private fun deleteBudget(id: Int) = viewModelScope.launch {
@@ -65,5 +79,16 @@ class BudgetsViewModel @Inject constructor(
         )
         runCatching { insertBudget(newBudget) }
             .onFailure { _state.update { s -> s.copy(error = it.message) } }
+    }
+    private fun checkAndNotifyThreshold(budget: Budget) {
+        val used = budget.spent / budget.limit
+        val percentage = (used * 100).toInt()
+        if (used >= budget.alertThreshold / 100.0) {
+            NotificationHelper.showBudgetAlert(
+                context = getApplication<Application>().applicationContext,
+                category = budget.category.name,
+                percentage = percentage
+            )
+        }
     }
 }

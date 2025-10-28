@@ -130,6 +130,7 @@ fun GoalListItem(
                 Text("+ Agregar Ahorro")
             }
         }
+
     }
 
     // Dialog para agregar ahorro

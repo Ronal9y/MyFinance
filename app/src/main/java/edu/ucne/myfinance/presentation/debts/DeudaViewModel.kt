@@ -17,12 +17,19 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import android.app.Application
+import android.content.Context
+import androidx.lifecycle.AndroidViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import edu.ucne.myfinance.common.NotificationHelper
+import java.time.temporal.ChronoUnit
 
 @HiltViewModel
 class DeudaViewModel @Inject constructor(
     private val getDebtsUC: GetDebtsWithInterestUseCase,
-    private val repo: DebtRepository
-) : ViewModel() {
+    private val repo: DebtRepository,
+    @ApplicationContext private val context: Context
+) : AndroidViewModel(context as Application) {
 
     private val _uiState = MutableStateFlow(DeudaUiState())
     val uiState: StateFlow<DeudaUiState> = _uiState.asStateFlow()
@@ -128,6 +135,8 @@ class DeudaViewModel @Inject constructor(
                     cargando = false
                 )
             }
+            checkAndNotifyDueDebts(deudasActualizadas)
+
         }
     }
 
@@ -181,5 +190,21 @@ class DeudaViewModel @Inject constructor(
         val endDate = fmt.parse(end) ?: return 0
         val ms = endDate.time - startDate.time
         return TimeUnit.DAYS.convert(ms, TimeUnit.MILLISECONDS)
+    }
+    private fun checkAndNotifyDueDebts(debts: List<Debt>) {
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val today = fmt.format(Date()) // hoy como String
+
+        debts.forEach { debt ->
+            val dueDate = debt.dueDate
+            val daysLeft = diasEntre(today, dueDate)
+            if (daysLeft == 1L && debt.remainingAmount > 0) {
+                NotificationHelper.showDebtDueSoonAlert(
+                    context = getApplication<Application>().applicationContext,
+                    debtName = debt.name,
+                    daysLeft = daysLeft.toInt()
+                )
+            }
+        }
     }
 }
