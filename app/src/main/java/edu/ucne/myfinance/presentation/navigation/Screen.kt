@@ -29,4 +29,8 @@ sealed class Screen {
     data object AddDebt : Screen()
     @Serializable
     data object Analysis : Screen()
+
+    @Serializable object Welcome : Screen()
+    @Serializable object Login    : Screen()
+    @Serializable object Splash   : Screen()
 }

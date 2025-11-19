@@ -5,10 +5,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -16,15 +20,34 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import edu.ucne.myfinance.presentation.users.AuthEvent
+import edu.ucne.myfinance.presentation.users.AuthViewModel
+import edu.ucne.myfinance.presentation.users.UserBottomSheet
 import edu.ucne.myfinance.ui.theme.MyFinanceTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalysisScreen(
     onBack: () -> Unit,
-    viewModel: AnalysisViewModel = hiltViewModel()
+    onLogoutClick: () -> Unit,
+    viewModel: AnalysisViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val user by authViewModel.currentUser.collectAsState(initial = null)
+    var showUserMenu by remember { mutableStateOf(false) }
+
+    if (showUserMenu) {
+        ModalBottomSheet(onDismissRequest = { showUserMenu = false }) {
+            UserBottomSheet(
+                userName = user?.username ?: "Anónimo",
+                onLogout = {
+                    authViewModel.onEvent(AuthEvent.Logout)
+                    onLogoutClick() // ⬅ lambda que navega
+                }
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -39,6 +62,11 @@ fun AnalysisScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { showUserMenu = true }) { // ⬅ abre modal
+                        Icon(Icons.Default.Person, contentDescription = "Cuenta")
                     }
                 }
             )
@@ -227,6 +255,6 @@ fun StatisticItem(label: String, value: String) {
 @Composable
 fun AnalysisScreenPreview() {
     MyFinanceTheme {
-        AnalysisScreen(onBack = {})
+        AnalysisScreen(onBack = {},onLogoutClick = {})
     }
 }

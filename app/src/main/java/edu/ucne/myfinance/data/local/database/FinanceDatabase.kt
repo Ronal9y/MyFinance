@@ -13,6 +13,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import edu.ucne.myfinance.data.local.dao.UserDao
+import edu.ucne.myfinance.data.local.entity.UserEntity
 
 
 @Database(
@@ -20,9 +22,10 @@ import androidx.room.TypeConverters
         TransactionEntity::class,
         BudgetEntity::class,
         GoalEntity::class,
-        DebtEntity::class
+        DebtEntity::class,
+        UserEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class FinanceDatabase : RoomDatabase() {
@@ -30,4 +33,5 @@ abstract class FinanceDatabase : RoomDatabase() {
     abstract fun budgetDao(): BudgetDao
     abstract fun goalDao(): GoalDao
     abstract fun debtDao(): DebtDao
+    abstract fun userDao(): UserDao
 }
