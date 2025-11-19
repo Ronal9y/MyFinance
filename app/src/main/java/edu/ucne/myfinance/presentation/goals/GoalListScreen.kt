@@ -3,6 +3,7 @@ package edu.ucne.myfinance.presentation.goals
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
@@ -10,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import edu.ucne.myfinance.data.local.database.FinanceDatabase
@@ -48,22 +50,41 @@ fun GoalListItem(
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var addAmount by remember { mutableStateOf("") }
+    var showConfirm by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            // Header
+    if (showConfirm) {
+        AlertDialog(
+            onDismissRequest = { showConfirm = false },
+            title = { Text("¿Eliminar meta?") },
+            text = {
+                Text("Esta acción no se puede deshacer. ¿Estás seguro de eliminar esta meta?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete()
+                        showConfirm = false
+                    }
+                ) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showConfirm = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         goal.name,
                         style = MaterialTheme.typography.titleMedium,
@@ -82,7 +103,7 @@ fun GoalListItem(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onDelete) {
+                IconButton(onClick = { showConfirm = true }) {
                     Icon(
                         Icons.Default.Delete,
                         contentDescription = "Eliminar",
@@ -93,7 +114,6 @@ fun GoalListItem(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Progreso
             val progress = (goal.currentAmount / goal.targetAmount).coerceIn(0.0, 1.0)
             val percentage = (progress * 100).toInt()
 
@@ -122,7 +142,6 @@ fun GoalListItem(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Botón para agregar ahorro
             Button(
                 onClick = { showAddDialog = true },
                 modifier = Modifier.fillMaxWidth()
@@ -130,10 +149,8 @@ fun GoalListItem(
                 Text("+ Agregar Ahorro")
             }
         }
-
     }
 
-    // Dialog para agregar ahorro
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -147,7 +164,10 @@ fun GoalListItem(
                         onValueChange = { addAmount = it },
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("0.00") },
-                        singleLine = true
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal
+                        )
                     )
                 }
             },
