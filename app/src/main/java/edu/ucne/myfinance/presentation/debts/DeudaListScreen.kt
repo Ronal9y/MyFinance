@@ -58,7 +58,11 @@ fun DeudaListScreen(
                     onClick = {
                         val monto = montoPago.toDoubleOrNull() ?: 0.0
                         if (monto > 0) {
-                            viewModel.onEvent(DeudaEvent.PagarCuota(state.mostrarDialogoPago!!, monto))
+                            viewModel.onEvent(
+                                DeudaEvent.PagarCuota(state.mostrarDialogoPago!!, monto)
+                            )
+                            // ← cerrar aquí
+                            viewModel.onEvent(DeudaEvent.MostrarDialogoPago(null))
                             montoPago = ""
                         }
                     }
@@ -66,6 +70,7 @@ fun DeudaListScreen(
                     Text("Pagar")
                 }
             },
+
             dismissButton = {
                 TextButton(onClick = { viewModel.onEvent(DeudaEvent.MostrarDialogoPago(null)) }) {
                     Text("Cancelar")
@@ -210,9 +215,9 @@ fun DeudaListScreen(
                             deuda = deuda,
                             onAbonar = { id -> viewModel.onEvent(DeudaEvent.MostrarDialogoPago(id)) },
                             onEliminar = { id -> viewModel.onEvent(DeudaEvent.EliminarDeuda(id)) },
-                            onRenovar = { id ->
+                            /*onRenovar ={} { id ->
                                 viewModel.onEvent(DeudaEvent.MostrarDialogoRenovar(id))
-                            }
+                            }*/
                         )
                     }
                 }
@@ -234,27 +239,16 @@ fun EmptyDebtsSection(onAdd: () -> Unit) {
         }
     }
 }
+
 @Composable
 fun DeudaCard(
     deuda: Debt,
     onAbonar: (Int) -> Unit,
     onEliminar: (Int) -> Unit,
-    onRenovar: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showConfirm by remember { mutableStateOf(false) }
 
-    // Cálculos simples sin interés automático
-    val restanteReal = deuda.remainingAmount
-    val progreso = if (deuda.principalAmount > 0) {
-        ((deuda.principalAmount - restanteReal) / deuda.principalAmount).toFloat().coerceIn(0f, 1f)
-    } else {
-        0f
-    }
-
-    val vencido = remember(deuda.dueDate) { diasEntre(hoy(), deuda.dueDate) < 0 }
-
-    // Diálogo de confirmación de eliminación...
     if (showConfirm) {
         AlertDialog(
             onDismissRequest = { showConfirm = false },
@@ -298,7 +292,6 @@ fun DeudaCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Header con nombre y botón eliminar...
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -326,7 +319,6 @@ fun DeudaCard(
 
             Spacer(Modifier.height(12.dp))
 
-            // Información de montos y fecha...
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -338,20 +330,12 @@ fun DeudaCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "$${"%.2f".format(restanteReal)}",
+                        text = "$${"%.2f".format(deuda.remainingAmount)}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (restanteReal > 0) MaterialTheme.colorScheme.error
+                        color = if (deuda.remainingAmount > 0) MaterialTheme.colorScheme.error
                         else MaterialTheme.colorScheme.primary
                     )
-                    deuda.interestRate?.let { tasa ->
-                        Text(
-                            text = "Interés: ${tasa}% ${deuda.interestType.name.lowercase()}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
@@ -362,30 +346,24 @@ fun DeudaCard(
                     Text(
                         text = deuda.dueDate,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (vencido) MaterialTheme.colorScheme.error
-                        else MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // Barra de progreso...
             LinearProgressIndicator(
-                progress = { progreso },
+                progress = { 1f - (deuda.remainingAmount / deuda.principalAmount).toFloat() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),
-                color = when {
-                    progreso >= 1f -> MaterialTheme.colorScheme.primary
-                    vencido -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.tertiary
-                },
+                color = MaterialTheme.colorScheme.primary,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
             Text(
-                text = "${(progreso * 100).toInt()}% completado",
+                text = "${((1f - (deuda.remainingAmount / deuda.principalAmount).toFloat()) * 100).toInt()}% completado",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
@@ -393,64 +371,237 @@ fun DeudaCard(
 
             Spacer(Modifier.height(8.dp))
 
-            // BOTÓN CORREGIDO - Solo dice "Renovar" cuando está vencido
-            if (vencido) {
-                Button(
-                    onClick = { onRenovar(deuda.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
-                ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Renovar") // Solo dice "Renovar"
-                }
-            } else {
-                Button(
-                    onClick = { onAbonar(deuda.id) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = restanteReal > 0
-                ) {
-                    Icon(Icons.Default.Payment, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Abonar cuota")
-                }
+            // Solo botón ABONAR
+            Button(
+                onClick = { onAbonar(deuda.id) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = deuda.remainingAmount > 0
+            ) {
+                Icon(Icons.Default.Payment, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Abonar")
             }
         }
     }
-
-
-private fun saldoHoy(deuda: Debt): Pair<Double, Float> {
-    val dias = diasEntre(hoy(), deuda.dueDate)
-    val periodos = when (deuda.compoundingPeriod) {
-        CompoundingPeriod.DAILY   -> dias.toDouble()
-        CompoundingPeriod.WEEKLY  -> dias / 7.0
-        CompoundingPeriod.MONTHLY -> dias / 30.0
-        CompoundingPeriod.YEARLY  -> dias / 365.0
-    }.coerceAtLeast(0.0)
-
-    val tasaPorPeriodo = (deuda.interestRate ?: 0.0) / 100.0 /
-            when (deuda.compoundingPeriod) {
-                CompoundingPeriod.DAILY   -> 365.0
-                CompoundingPeriod.WEEKLY  -> 52.0
-                CompoundingPeriod.MONTHLY -> 12.0
-                CompoundingPeriod.YEARLY  -> 1.0
-            }
-
-    val factor = (1 + tasaPorPeriodo).pow(periodos)
-    val saldoActual = deuda.principalAmount * factor
-    val progreso = ((deuda.principalAmount - saldoActual) / deuda.principalAmount).toFloat()
-        .coerceIn(0f, 1f)
-
-    return Pair(saldoActual, progreso)
 }
 
-private fun hoy(): String =
-    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date())
-
-private fun diasEntre(start: String, end: String): Long {
-    val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-    val ms = fmt.parse(end)!!.time - fmt.parse(start)!!.time
-    return TimeUnit.DAYS.convert(ms, TimeUnit.MILLISECONDS)
-}
+//@Composable
+//fun DeudaCard(
+//    deuda: Debt,
+//    onAbonar: (Int) -> Unit,
+//    onEliminar: (Int) -> Unit,
+//    onRenovar: (Int) -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    var showConfirm by remember { mutableStateOf(false) }
+//
+//    // Cálculos simples sin interés automático
+//    val restanteReal = deuda.remainingAmount
+//    val progreso = if (deuda.principalAmount > 0) {
+//        ((deuda.principalAmount - restanteReal) / deuda.principalAmount).toFloat().coerceIn(0f, 1f)
+//    } else {
+//        0f
+//    }
+//
+//    val vencido = remember(deuda.dueDate) { diasEntre(hoy(), deuda.dueDate) < 0 }
+//
+//    // Diálogo de confirmación de eliminación...
+//    if (showConfirm) {
+//        AlertDialog(
+//            onDismissRequest = { showConfirm = false },
+//            title = { Text("¿Eliminar deuda?") },
+//            text = {
+//                Text(
+//                    if (deuda.remainingAmount > 0)
+//                        "Aún queda saldo pendiente. ¿Seguro que deseas eliminarla?"
+//                    else "La deuda ya está saldada. ¿Deseas eliminarla?"
+//                )
+//            },
+//            confirmButton = {
+//                Button(
+//                    onClick = {
+//                        onEliminar(deuda.id)
+//                        showConfirm = false
+//                    },
+//                    colors = ButtonDefaults.buttonColors(
+//                        containerColor = MaterialTheme.colorScheme.error
+//                    )
+//                ) {
+//                    Text("Eliminar")
+//                }
+//            },
+//            dismissButton = {
+//                TextButton(onClick = { showConfirm = false }) {
+//                    Text("Cancelar")
+//                }
+//            }
+//        )
+//    }
+//
+//    ElevatedCard(
+//        modifier = modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 16.dp, vertical = 8.dp),
+//        shape = RoundedCornerShape(16.dp)
+//    ) {
+//        Column(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(16.dp)
+//        ) {
+//            // Header con nombre y botón eliminar...
+//            Row(
+//                verticalAlignment = Alignment.CenterVertically,
+//                modifier = Modifier.fillMaxWidth()
+//            ) {
+//                Column(Modifier.weight(1f)) {
+//                    Text(
+//                        text = deuda.name,
+//                        style = MaterialTheme.typography.titleLarge,
+//                        fontWeight = FontWeight.Bold
+//                    )
+//                    Text(
+//                        text = "Acreedor: ${deuda.creditor}",
+//                        style = MaterialTheme.typography.bodyMedium,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
+//                }
+//                IconButton(onClick = { showConfirm = true }) {
+//                    Icon(
+//                        Icons.Default.Delete,
+//                        contentDescription = "Eliminar",
+//                        tint = MaterialTheme.colorScheme.error
+//                    )
+//                }
+//            }
+//
+//            Spacer(Modifier.height(12.dp))
+//
+//            // Información de montos y fecha...
+//            Row(
+//                modifier = Modifier.fillMaxWidth(),
+//                horizontalArrangement = Arrangement.SpaceBetween
+//            ) {
+//                Column {
+//                    Text(
+//                        text = "Restante hoy",
+//                        style = MaterialTheme.typography.labelMedium,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
+//                    Text(
+//                        text = "$${"%.2f".format(restanteReal)}",
+//                        style = MaterialTheme.typography.titleMedium,
+//                        fontWeight = FontWeight.Bold,
+//                        color = if (restanteReal > 0) MaterialTheme.colorScheme.error
+//                        else MaterialTheme.colorScheme.primary
+//                    )
+//                    deuda.interestRate?.let { tasa ->
+//                        Text(
+//                            text = "Interés: ${tasa}% ${deuda.interestType.name.lowercase()}",
+//                            style = MaterialTheme.typography.bodySmall,
+//                            color = MaterialTheme.colorScheme.onSurfaceVariant
+//                        )
+//                    }
+//                }
+//                }
+//                Column(horizontalAlignment = Alignment.End) {
+//                    Text(
+//                        text = "Fecha límite",
+//                        style = MaterialTheme.typography.labelMedium,
+//                        color = MaterialTheme.colorScheme.onSurfaceVariant
+//                    )
+//                    Text(
+//                        text = deuda.dueDate,
+//                        style = MaterialTheme.typography.bodyMedium,
+//                        color = if (vencido) MaterialTheme.colorScheme.error
+//                        else MaterialTheme.colorScheme.onSurface
+//                    )
+//                }
+//            }
+//
+//            Spacer(Modifier.height(12.dp))
+//
+//            // Barra de progreso...
+//            LinearProgressIndicator(
+//                progress = { progreso },
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .height(8.dp),
+//                color = when {
+//                    progreso >= 1f -> MaterialTheme.colorScheme.primary
+//                    vencido -> MaterialTheme.colorScheme.error
+//                    else -> MaterialTheme.colorScheme.tertiary
+//                },
+//                trackColor = MaterialTheme.colorScheme.surfaceVariant
+//            )
+//
+//            Text(
+//                text = "${(progreso * 100).toInt()}% completado",
+//                style = MaterialTheme.typography.bodySmall,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                modifier = Modifier.padding(top = 4.dp)
+//            )
+//
+//            Spacer(Modifier.height(8.dp))
+//
+//            // BOTÓN CORREGIDO - Solo dice "Renovar" cuando está vencido
+//            if (vencido) {
+//                Button(
+//                    onClick = { onRenovar(deuda.id) },
+//                    modifier = Modifier.fillMaxWidth(),
+//                    colors = ButtonDefaults.buttonColors(
+//                        containerColor = MaterialTheme.colorScheme.tertiary
+//                    )
+//                ) {
+//                    Icon(Icons.Default.Refresh, contentDescription = null)
+//                    Spacer(Modifier.width(8.dp))
+//                    Text("Renovar") // Solo dice "Renovar"
+//                }
+//            } else {
+//                Button(
+//                    onClick = { onAbonar(deuda.id) },
+//                    modifier = Modifier.fillMaxWidth(),
+//                    enabled = restanteReal > 0
+//                ) {
+//                    Icon(Icons.Default.Payment, contentDescription = null)
+//                    Spacer(Modifier.width(8.dp))
+//                    Text("Abonar cuota")
+//                }
+//            }
+//        }
+//    }
+//
+//
+//private fun saldoHoy(deuda: Debt): Pair<Double, Float> {
+//    val dias = diasEntre(hoy(), deuda.dueDate)
+//    val periodos = when (deuda.compoundingPeriod) {
+//        CompoundingPeriod.DAILY   -> dias.toDouble()
+//        CompoundingPeriod.WEEKLY  -> dias / 7.0
+//        CompoundingPeriod.MONTHLY -> dias / 30.0
+//        CompoundingPeriod.YEARLY  -> dias / 365.0
+//    }.coerceAtLeast(0.0)
+//
+//    val tasaPorPeriodo = (deuda.interestRate ?: 0.0) / 100.0 /
+//            when (deuda.compoundingPeriod) {
+//                CompoundingPeriod.DAILY   -> 365.0
+//                CompoundingPeriod.WEEKLY  -> 52.0
+//                CompoundingPeriod.MONTHLY -> 12.0
+//                CompoundingPeriod.YEARLY  -> 1.0
+//            }
+//
+//    val factor = (1 + tasaPorPeriodo).pow(periodos)
+//    val saldoActual = deuda.principalAmount * factor
+//    val progreso = ((deuda.principalAmount - saldoActual) / deuda.principalAmount).toFloat()
+//        .coerceIn(0f, 1f)
+//
+//    return Pair(saldoActual, progreso)
+//}
+//
+//private fun hoy(): String =
+//    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(java.util.Date())
+//
+//private fun diasEntre(start: String, end: String): Long {
+//    val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+//    val ms = fmt.parse(end)!!.time - fmt.parse(start)!!.time
+//    return TimeUnit.DAYS.convert(ms, TimeUnit.MILLISECONDS)
+//}

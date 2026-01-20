@@ -55,6 +55,10 @@ object AppModule {
         return database.debtDao()
     }
 
+    @Provides
+    @Singleton
+    fun provideUserDao(db: FinanceDatabase) = db.userDao()
+
     // Repositories
     @Provides
     @Singleton
@@ -79,4 +83,8 @@ object AppModule {
     fun provideDebtRepository(dao: DebtDao): DebtRepository {
         return DebtRepositoryImpl(dao)
     }
+
+    @Provides
+    @Singleton
+    fun provideUserRepository(dao: UserDao): UserRepository = UserRepositoryImpl(dao)
 }
